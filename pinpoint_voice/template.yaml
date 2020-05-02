@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Amazon Pinpoint Voice Channel.  This application will place outbound calls triggered by Amazon Pinpoint.  Written in Python3.
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  PINPOINT_LONG_CODES:
+    Type: String
+    Description: Comma delimitted list of Pinpoint Long Codes
+
+Globals:
+  Function:
+    Timeout: 30
+
+Resources:
+  PinpointVoiceChannelFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: AmazonPinpointVoiceChannel
+      CodeUri: pinpointvoice/
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Environment:
+        Variables:
+          PINPOINT_LONG_CODES:
+            Ref: PINPOINT_LONG_CODES
+
+  PinpointInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref PinpointVoiceChannelFunction
+      Principal: !Sub pinpoint.${AWS::Region}.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:mobiletargeting:${AWS::Region}:${AWS::AccountId}:apps/*
+
+Outputs:
+  PinpointVoiceChannelFunction:
+    Description: "A function invoked by an Amazon Pinpoint Campaign or Journey that will place an outbound call to a user"
+    Value: !GetAtt PinpointVoiceChannelFunction.Arn
