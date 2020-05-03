@@ -3,36 +3,74 @@ Description: Amazon Pinpoint Voice Channel.  This application will place outboun
 Transform: AWS::Serverless-2016-10-31
 
 Parameters:
-  PINPOINT_LONG_CODES:
+  PINPOINTLONGCODES:
     Type: String
     Description: Comma delimitted list of Pinpoint Long Codes
 
-Globals:
-  Function:
-    Timeout: 30
 
 Resources:
-  PinpointVoiceChannelFunction:
+  VoiceSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 1800
+
+  PinpointVoiceQueuerFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: AmazonPinpointVoiceChannel
+      CodeUri: voicequeuer/
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Timeout: 5
+      Environment:
+        Variables:
+          SQS_QUEUE_URL: !Ref VoiceSQSQueue
+      Policies:
+        - Statement:
+          - Sid: WriteSQS
+            Effect: Allow
+            Action: sqs:SendMessage
+            Resource: !GetAtt VoiceSQSQueue.Arn
+
+
+  PinpointVoiceChannelFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: AmazonPinpointVoiceChannel-backgrounprocessor
       CodeUri: pinpointvoice/
       Handler: app.lambda_handler
       Runtime: python3.7
+      Timeout: 900
+      ReservedConcurrentExecutions: 1
+      Events:
+        VoiceSQSQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt VoiceSQSQueue.Arn
+            BatchSize: 10
       Environment:
         Variables:
-          PINPOINT_LONG_CODES:
-            Ref: PINPOINT_LONG_CODES
+          PINPOINT_LONG_CODES: !Ref PINPOINTLONGCODES
+      Policies:
+        - Statement:
+          - Sid: SendVoiceMessage
+            Effect: Allow
+            Action: sms-voice:SendVoiceMessage
+            Resource: !Sub arn:aws:sms-voice:${AWS::Region}:${AWS::AccountId}:/v1/sms-voice/voice/message
+          - Sid: PinpointPutEvents
+            Effect: Allow
+            Action: mobiletargeting:PutEvents
+            Resource: !Sub arn:${AWS::Partition}:mobiletargeting:${AWS::Region}:${AWS::AccountId}:*
 
   PinpointInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref PinpointVoiceChannelFunction
+      FunctionName: !Ref PinpointVoiceQueuerFunction
       Principal: !Sub pinpoint.${AWS::Region}.amazonaws.com
       SourceArn: !Sub arn:${AWS::Partition}:mobiletargeting:${AWS::Region}:${AWS::AccountId}:apps/*
 
 Outputs:
-  PinpointVoiceChannelFunction:
+  PinpointVoiceQueuerFunction:
     Description: "A function invoked by an Amazon Pinpoint Campaign or Journey that will place an outbound call to a user"
-    Value: !GetAtt PinpointVoiceChannelFunction.Arn
+    Value: !GetAtt PinpointVoiceQueuerFunction.Arn

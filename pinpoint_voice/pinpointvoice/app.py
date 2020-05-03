@@ -6,72 +6,118 @@ pinpoint_sms_voice = boto3.client('pinpoint-sms-voice')
 pinpoint_long_codes = os.environ['PINPOINT_LONG_CODES'].split(',')
 
 # This function can be used within an Amazon Pinpoint Campaign or Amazon Pinpoint Journey.
-# When invoked by the Amazon Pinpoint service the code below will utilize the DirectMessage API of Twitter to send a user a private twitter message.
 
 def lambda_handler(event, context):
 
     logging.getLogger().setLevel('INFO')
-    # print the payload the Lambda was invoked with
+    # print the payload the Lambda was invoked with from SQS
     logging.info(event)
 
-    if 'Endpoints' not in event:
-        return "Function invoked without endpoints."
-    # A valid invocation of this channel by the Pinpoint Service will include Endpoints in the event payload
+    for record in event['Records']:
+        payload=record["body"]
+        pinpoint_event = json.loads(payload)
 
-    endpoints = event['Endpoints']
-    pinpoint_project_id = event['ApplicationId']
+        if 'Endpoints' not in pinpoint_event:
+            return "Function invoked without endpoints."
+        # A valid invocation of this channel by the Pinpoint Service will include Endpoints in the pinpoint_event payload
 
-    i = 0
-    for endpoint_id in endpoints:
+        endpoints = pinpoint_event['Endpoints']
+        pinpoint_project_id = pinpoint_event['ApplicationId']
 
-        long_code = pinpoint_long_codes[i % len(pinpoint_long_codes)]
-        i += 1
-        endpoint_profile = endpoints[endpoint_id]
-        # the endpoint profile contains the entire endpoint definition.
-        # Attributes and UserAttributes can be interpolated into your message for personalization.
+        custom_events_batch = {}
+        # Gather events to emit back to Pinpoint for reporting
 
-        address = endpoints[endpoint_id]['Address']
-        # address is expected to be a Phone Number e.g. +15555555555.
+        i = 0
+        for endpoint_id in endpoints:
 
-        message = "Hello World!  -Pinpoint Voice Channel"
-        # construct your message here.  You have access to the endpoint profile to personalize the message with Attributes.
-        # e.g. message = "Hello {name}!  -Pinpoint Twitter Channel".format(name=endpoint_profile["Attributes"]["FirstName"])
+            long_code = pinpoint_long_codes[i % len(pinpoint_long_codes)]
+            i += 1
+            endpoint_profile = endpoints[endpoint_id]
+            # the endpoint profile contains the entire endpoint definition.
+            # Attributes and UserAttributes can be interpolated into your message for personalization.
 
-        logging.info(endpoint_id)
-        logging.info(endpoint_profile)
-        logging.info(address)
-        logging.info(message)
-        logging.info(long_code)
+            address = endpoints[endpoint_id]['Address']
+            # address is expected to be a Phone Number e.g. +15555555555.
 
-        try:
+            message = "Hello World!  -Pinpoint Voice Channel"
+            # construct your message here.  You have access to the endpoint profile to personalize the message with Attributes.
+            # e.g. message = "Hello {name}!  -Pinpoint Voice Channel".format(name=endpoint_profile["Attributes"]["FirstName"])
 
-            response = pinpoint_sms_voice.send_voice_message(
-                Content={
-                    'PlainTextMessage': {
-                        'LanguageCode': 'en-US',
-                        'Text': message
-                    }
-                },
-                DestinationPhoneNumber=address,
-                OriginationPhoneNumber=long_code
-            )
-            logging.info(response)
+            logging.info(endpoint_id)
+            logging.info(endpoint_profile)
+            logging.info(address)
+            logging.info(message)
+            logging.info(long_code)
 
-            # Twitter Direct Message docs - https://developer.twitter.com/en/docs/direct-messages/sending-and-receiving/api-reference/new-event
-            # Note: In order for a user to receive a direct message they must have a conversation history with your application or allow direct messages.
-            #result = twitter_api.PostDirectMessage(text=message, user_id=address, return_json=True)
-            #print(result)
+            try:
 
-            # To utilize other Twitter APIs here see Twitters API documentation - https://developer.twitter.com/en/docs/basics/getting-started
+                response = pinpoint_sms_voice.send_voice_message(
+                    Content={
+                        'PlainTextMessage': {
+                            'LanguageCode': 'en-US',
+                            'Text': message
+                        }
+                    },
+                    DestinationPhoneNumber=address,
+                    OriginationPhoneNumber=long_code
+                )
+                logging.info(response)
 
-        except Exception as e:
-            logging.error(e)
-            # see a list of exceptions returned from the api here - https://developer.twitter.com/en/docs/basics/response-codes
-            logging.error("Error trying to send a Pinpoint Voice message")
+                custom_events_batch[endpoint_id] = create_success_custom_event(endpoint_id, event['CampaignId'], message)
 
-        if i % len(pinpoint_long_codes):
-            sleep(3)
-        # Sleep 3 seconds between calls on the same long code avoid rate limiting
+            except Exception as e:
+                logging.error(e)
+                logging.error("Error trying to send a Pinpoint Voice message")
+
+                custom_events_batch[endpoint_id] = create_failure_custom_event(endpoint_id, event['CampaignId'], e)
+
+            if i % len(pinpoint_long_codes):
+                sleep(3)
+            # Sleep 3 seconds between calls on the same long code avoid rate limiting
+
+    try:
+        # submit events back to Pinpoint for reporting
+        put_events_result = pinpoint_client.put_events(
+            ApplicationId=event['ApplicationId'],
+            EventsRequest={
+                'BatchItem': custom_events_batch
+            }
+        )
+        logging.info(put_events_result)
+    except Exception as e:
+        logging.error(e)
+        logging.error("Error trying to send custom events to Pinpoint")
+
 
     logging.info("Complete")
     return "Complete"
+
+def create_success_custom_event(endpoint_id, campaign_id, message):
+    custom_event = {
+        'Endpoint': {},
+        'Events': {}
+    }
+    custom_event['Events']['voice_%s_%s' % (endpoint_id, campaign_id)] = {
+        'EventType': 'voice.success',
+        'Timestamp': datetime.datetime.now().isoformat(),
+        'Attributes': {
+            'campaign_id': campaign_id,
+            'message': message
+        }
+    }
+    return custom_event
+
+def create_failure_custom_event(endpoint_id, campaign_id, e):
+    custom_event = {
+        'Endpoint': {},
+        'Events': {}
+    }
+    custom_event['Events']['voice_%s_%s' % (endpoint_id, campaign_id)] = {
+        'EventType': 'voice.failure',
+        'Timestamp': datetime.datetime.now().isoformat(),
+        'Attributes': {
+            'campaign_id': campaign_id,
+            'error': repr(e)
+        }
+    }
+    return custom_event
