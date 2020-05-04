@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Amazon Pinpoint Connect Channel.  This application will place outbound calls with Amazon Connect triggered by Amazon Pinpoint.  Written in Python3.
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  ConnectContactFlowId:
+    Type: String
+    Description: Amazon Connect Contact Flow ID to use for the outbound call
+  ConnectInstanceId:
+    Type: String
+    Description: Amazon Connect Instance ID to use for the outbound call
+  ConnectQueueId:
+    Type: String
+    Description: Amazon Connect Queue ID to use for the outbound call
+
+Resources:
+  ConnectSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 100
+
+  PinpointConnectQueuerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: AmazonPinpointConnectChannel
+      CodeUri: connectqueuer/
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Timeout: 60
+      Environment:
+        Variables:
+          SQS_QUEUE_URL: !Ref ConnectSQSQueue
+          CONNECT_CONTACT_FLOW_ID: !Ref ConnectContactFlowId
+          CONNECT_INSTANCE_ID: !Ref ConnectInstanceId
+          CONNECT_QUEUE_ID: !Ref ConnectQueueId
+      Policies:
+        - Statement:
+          - Sid: WriteSQS
+            Effect: Allow
+            Action: sqs:SendMessage
+            Resource: !GetAtt ConnectSQSQueue.Arn
+
+
+  PinpointConnectChannelFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: AmazonPinpointConnectChannel-backgrounprocessor
+      CodeUri: pinpointconnect/
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Timeout: 45
+      ReservedConcurrentExecutions: 5
+      Events:
+        ConnectSQSQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ConnectSQSQueue.Arn
+            BatchSize: 5
+      Policies:
+        - Statement:
+          - Sid: SendOutboundConnect
+            Effect: Allow
+            Action: connect:StartOutboundVoiceContact
+            Resource: !Sub "arn:aws:connect:${AWS::Region}:${AWS::AccountId}:instance/${ConnectInstanceId}/contact/*"
+          - Sid: PinpointPutEvents
+            Effect: Allow
+            Action: mobiletargeting:PutEvents
+            Resource: !Sub arn:${AWS::Partition}:mobiletargeting:${AWS::Region}:${AWS::AccountId}:*
+
+
+  PinpointInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref PinpointConnectQueuerFunction
+      Principal: !Sub pinpoint.${AWS::Region}.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:mobiletargeting:${AWS::Region}:${AWS::AccountId}:apps/*
+
+Outputs:
+  PinpointConnectQueuerFunctionArn:
+    Description: "A function invoked by an Amazon Pinpoint Campaign or Journey that will place an outbound call to a user using Amazon Connect"
+    Value: !GetAtt PinpointConnectQueuerFunction.Arn
