@@ -67,7 +67,7 @@ def lambda_handler(event, context):
             logging.error("Error trying to send custom events to Pinpoint")
 
         sleep(3)
-        # Sleep 3 seconds between calls on the same long code avoid rate limiting
+        # Sleep 3 seconds between calls on the same long code to avoid rate limiting
 
 
     logging.info("Complete")

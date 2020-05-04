@@ -5,7 +5,7 @@ Transform: AWS::Serverless-2016-10-31
 Parameters:
   PINPOINTLONGCODES:
     Type: String
-    Description: Set of Comma delimitted list of Pinpoint Long Codes.  Minimum 5.
+    Description: Comma delimitted list of Pinpoint Long Codes.
 
 
 Resources:
@@ -13,6 +13,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       VisibilityTimeout: 100
+      FifoQueue: true
 
   PinpointVoiceQueuerFunction:
     Type: AWS::Serverless::Function

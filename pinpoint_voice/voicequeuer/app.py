@@ -4,8 +4,6 @@ sqs = boto3.client('sqs')
 
 queue_url = os.environ['SQS_QUEUE_URL']
 pinpoint_long_codes = os.environ['PINPOINT_LONG_CODES'].split(',')
-random.shuffle(pinpoint_long_codes)
-
 
 # This function can be used within an Amazon Pinpoint Campaign or Amazon Pinpoint Journey.
 
@@ -48,7 +46,9 @@ def lambda_handler(event, context):
         try:
             response = sqs.send_message(
                 QueueUrl=queue_url,
-                MessageBody=json.dumps(msg)
+                MessageBody=json.dumps(msg),
+                MessageDeduplicationId="%s-%s" % (event['CampaignId'], endpoint_id),
+                MessageGroupId=long_code
             )
         except Exception as e:
             logging.error(e)
