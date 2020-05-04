@@ -103,12 +103,13 @@ def create_success_custom_event(endpoint_id, campaign_id, message):
         'Timestamp': datetime.datetime.now().isoformat(),
         'Attributes': {
             'campaign_id': campaign_id,
-            'message': message
+            'message': (message[:195] + '...') if len(message) > 195 else message
         }
     }
     return custom_event
 
 def create_failure_custom_event(endpoint_id, campaign_id, e):
+    error = repr(e)
     custom_event = {
         'Endpoint': {},
         'Events': {}
@@ -118,7 +119,7 @@ def create_failure_custom_event(endpoint_id, campaign_id, e):
         'Timestamp': datetime.datetime.now().isoformat(),
         'Attributes': {
             'campaign_id': campaign_id,
-            'error': repr(e)
+            'error': (error[:195] + '...') if len(error) > 195 else error
         }
     }
     return custom_event
