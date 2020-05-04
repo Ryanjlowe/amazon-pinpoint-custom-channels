@@ -5,14 +5,14 @@ Transform: AWS::Serverless-2016-10-31
 Parameters:
   PINPOINTLONGCODES:
     Type: String
-    Description: Comma delimitted list of Pinpoint Long Codes
+    Description: Set of Comma delimitted list of Pinpoint Long Codes.  Minimum 5.
 
 
 Resources:
   VoiceSQSQueue:
     Type: AWS::SQS::Queue
     Properties:
-      VisibilityTimeout: 1800
+      VisibilityTimeout: 100
 
   PinpointVoiceQueuerFunction:
     Type: AWS::Serverless::Function
@@ -21,10 +21,11 @@ Resources:
       CodeUri: voicequeuer/
       Handler: app.lambda_handler
       Runtime: python3.7
-      Timeout: 5
+      Timeout: 60
       Environment:
         Variables:
           SQS_QUEUE_URL: !Ref VoiceSQSQueue
+          PINPOINT_LONG_CODES: !Ref PINPOINTLONGCODES
       Policies:
         - Statement:
           - Sid: WriteSQS
@@ -40,17 +41,14 @@ Resources:
       CodeUri: pinpointvoice/
       Handler: app.lambda_handler
       Runtime: python3.7
-      Timeout: 900
-      ReservedConcurrentExecutions: 1
+      Timeout: 45
+      ReservedConcurrentExecutions: 5
       Events:
         VoiceSQSQueueEvent:
           Type: SQS
           Properties:
             Queue: !GetAtt VoiceSQSQueue.Arn
             BatchSize: 10
-      Environment:
-        Variables:
-          PINPOINT_LONG_CODES: !Ref PINPOINTLONGCODES
       Policies:
         - Statement:
           - Sid: SendVoiceMessage
@@ -61,6 +59,7 @@ Resources:
             Effect: Allow
             Action: mobiletargeting:PutEvents
             Resource: !Sub arn:${AWS::Partition}:mobiletargeting:${AWS::Region}:${AWS::AccountId}:*
+
 
   PinpointInvokePermission:
     Type: AWS::Lambda::Permission

@@ -2,6 +2,9 @@
 
 The purpose of this application is to be used in integration with Amazon Pinpoint Campaigns and Journeys to send outbound voice calls.
 
+NOTE: this will only work if you provide it at least 5 Long codes from Pinpoint - I'll explain more later.
+https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html Long polling, minimum 5 concurrent Lambdas
+
 This project contains source code and supporting files for a serverless application that you can deploy with the SAM CLI. It includes the following files and folders.
 
 - app.py - Code for the application's Lambda function.
