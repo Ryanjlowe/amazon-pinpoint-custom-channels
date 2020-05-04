@@ -1,7 +1,8 @@
 from time import sleep
-import boto3, json, os, logging
+import boto3, json, os, logging, datetime
 
 pinpoint_sms_voice = boto3.client('pinpoint-sms-voice')
+pinpoint_client = boto3.client('pinpoint')
 
 pinpoint_long_codes = os.environ['PINPOINT_LONG_CODES'].split(',')
 
@@ -63,13 +64,13 @@ def lambda_handler(event, context):
                 )
                 logging.info(response)
 
-                custom_events_batch[endpoint_id] = create_success_custom_event(endpoint_id, event['CampaignId'], message)
+                custom_events_batch[endpoint_id] = create_success_custom_event(endpoint_id, pinpoint_event['CampaignId'], message)
 
             except Exception as e:
                 logging.error(e)
                 logging.error("Error trying to send a Pinpoint Voice message")
 
-                custom_events_batch[endpoint_id] = create_failure_custom_event(endpoint_id, event['CampaignId'], e)
+                custom_events_batch[endpoint_id] = create_failure_custom_event(endpoint_id, pinpoint_event['CampaignId'], e)
 
             if i % len(pinpoint_long_codes):
                 sleep(3)
@@ -78,7 +79,7 @@ def lambda_handler(event, context):
     try:
         # submit events back to Pinpoint for reporting
         put_events_result = pinpoint_client.put_events(
-            ApplicationId=event['ApplicationId'],
+            ApplicationId=pinpoint_event['ApplicationId'],
             EventsRequest={
                 'BatchItem': custom_events_batch
             }
