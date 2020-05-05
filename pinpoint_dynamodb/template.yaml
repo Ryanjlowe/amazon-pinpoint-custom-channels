@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Amazon Pinpoint Connect Channel.  This application will place outbound calls with Amazon Connect triggered by Amazon Pinpoint.  Written in Python3.
+Description: Amazon Pinpoint Connect Channel.  This application will write messages to DynamoDB triggered by Amazon Pinpoint.  Written in Python3.
 Transform: AWS::Serverless-2016-10-31
 
 Resources:
@@ -60,5 +60,5 @@ Resources:
 
 Outputs:
   PinpointDynamoDBFunctionArn:
-    Description: "A function invoked by an Amazon Pinpoint Campaign or Journey that will place an outbound call to a user using Amazon Connect"
+    Description: "A function invoked by an Amazon Pinpoint Campaign or Journey that will will write messages to DynamoDB"
     Value: !GetAtt PinpointDynamoDBFunction.Arn

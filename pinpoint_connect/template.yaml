@@ -18,6 +18,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       VisibilityTimeout: 100
+      FifoQueue: true
 
   PinpointConnectQueuerFunction:
     Type: AWS::Serverless::Function

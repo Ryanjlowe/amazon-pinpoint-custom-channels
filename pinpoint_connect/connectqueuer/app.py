@@ -47,7 +47,9 @@ def lambda_handler(event, context):
         try:
             response = sqs.send_message(
                 QueueUrl=queue_url,
-                MessageBody=json.dumps(msg)
+                MessageBody=json.dumps(msg),
+                MessageDeduplicationId="%s-%s" % (event['CampaignId'], endpoint_id),
+                MessageGroupId=queue_id
             )
         except Exception as e:
             logging.error(e)
