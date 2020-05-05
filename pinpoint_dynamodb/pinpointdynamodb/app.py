@@ -62,7 +62,7 @@ def lambda_handler(event, context):
             )
             logging.info(response)
 
-            custom_events_batch[endpoint_id] = create_success_custom_event(endpoint_id, campaign_id, message)
+            custom_events_batch[endpoint_id] = create_success_custom_event(endpoint_id, campaign_id, surface, message, ttl)
 
         except Exception as e:
             logging.error(e)
@@ -86,7 +86,7 @@ def lambda_handler(event, context):
     logging.info("Complete")
     return "Complete"
 
-def create_success_custom_event(endpoint_id, campaign_id, message):
+def create_success_custom_event(endpoint_id, campaign_id, surface, message, ttl):
     custom_event = {
         'Endpoint': {},
         'Events': {}
@@ -96,7 +96,9 @@ def create_success_custom_event(endpoint_id, campaign_id, message):
         'Timestamp': datetime.datetime.now().isoformat(),
         'Attributes': {
             'campaign_id': campaign_id,
-            'message': (message[:195] + '...') if len(message) > 195 else message
+            'surface': surface,
+            'message': (message[:195] + '...') if len(message) > 195 else message,
+            'ttl': "%s" % (ttl)
         }
     }
     return custom_event
