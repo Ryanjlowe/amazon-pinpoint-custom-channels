@@ -3,6 +3,9 @@ Description: Amazon Pinpoint Connect Channel.  This application will add users t
 Transform: AWS::Serverless-2016-10-31
 
 Parameters:
+  GoogleAdsClientCustomerId:
+    Type: String
+    Description: Google Ads Client Customer Id
   GoogleAdsDeveloperToken:
     Type: String
     Description: Google Ads Developer Token
@@ -30,6 +33,7 @@ Resources:
       Timeout: 60
       Environment:
         Variables:
+          CLIENT_CUSTOMER_ID: !Ref GoogleAdsClientCustomerId
           GOOGLE_ADS_DEVELOPER_TOKEN: !Ref GoogleAdsDeveloperToken
           GOOGLE_ADS_CLIENT_ID: !Ref GoogleAdsClientId
           GOOGLE_ADS_CLIENT_SECRET: !Ref GoogleAdsClientSecret
