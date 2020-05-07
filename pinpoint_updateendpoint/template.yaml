@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Amazon Pinpoint Update Endpoint Channel.  This application will update endpoints triggered by Amazon Pinpoint.  Written in Python3.
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+
+  UpdateEndpointFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: AmazonPinpointUpdateEndpointChannel
+      CodeUri: updateendpoint/
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      Timeout: 60
+      Policies:
+        - Statement:
+          - Sid: PinpointPutEvents
+            Effect: Allow
+            Action:
+              - mobiletargeting:PutEvents
+              - mobiletargeting:UpdateEndpoint
+            Resource: !Sub arn:${AWS::Partition}:mobiletargeting:${AWS::Region}:${AWS::AccountId}:*
+
+
+  PinpointInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref UpdateEndpointFunction
+      Principal: !Sub pinpoint.${AWS::Region}.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:mobiletargeting:${AWS::Region}:${AWS::AccountId}:apps/*
+
+Outputs:
+  UpdateEndpointFunctionArn:
+    Description: "A function invoked by an Amazon Pinpoint Campaign or Journey that will update Pinpoint Endpoints."
+    Value: !GetAtt UpdateEndpointFunction.Arn
